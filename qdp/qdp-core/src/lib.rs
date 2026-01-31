@@ -46,12 +46,11 @@ use crate::gpu::get_encoder;
 use cudarc::driver::CudaDevice;
 
 #[cfg(target_os = "linux")]
-fn validate_cuda_input_ptr(device: &CudaDevice, ptr: *const f64) -> Result<()> {
+fn validate_cuda_input_ptr(device: &CudaDevice, ptr: *const c_void) -> Result<()> {
     use crate::gpu::cuda_ffi::{
         CUDA_MEMORY_TYPE_DEVICE, CUDA_MEMORY_TYPE_MANAGED, CudaPointerAttributes,
         cudaPointerGetAttributes,
     };
-    use std::ffi::c_void;
 
     if ptr.is_null() {
         return Err(MahoutError::InvalidInput(
@@ -68,7 +67,7 @@ fn validate_cuda_input_ptr(device: &CudaDevice, ptr: *const f64) -> Result<()> {
         allocation_flags: 0,
     };
 
-    let ret = unsafe { cudaPointerGetAttributes(&mut attrs as *mut _, ptr as *const c_void) };
+    let ret = unsafe { cudaPointerGetAttributes(&mut attrs as *mut _, ptr) };
     if ret != 0 {
         return Err(MahoutError::InvalidInput(format!(
             "cudaPointerGetAttributes failed for input pointer: {} ({})",
@@ -431,7 +430,7 @@ impl QdpEngine {
             ));
         }
 
-        validate_cuda_input_ptr(&self.device, input_d)?;
+        validate_cuda_input_ptr(&self.device, input_d as *const c_void)?;
 
         let state_len = 1usize << num_qubits;
         let method = encoding_method.to_lowercase();
@@ -553,6 +552,131 @@ impl QdpEngine {
         }
     }
 
+    /// Encode from existing GPU pointer (float32 input, amplitude encoding only)
+    ///
+    /// Zero-copy encoding from PyTorch CUDA float32 tensors. Uses the default CUDA stream.
+    /// For stream interop use `encode_from_gpu_ptr_f32_with_stream`.
+    ///
+    /// # Arguments
+    /// * `input_d` - Device pointer to input data (f32 array on GPU)
+    /// * `input_len` - Number of f32 elements in the input
+    /// * `num_qubits` - Number of qubits for encoding
+    ///
+    /// # Returns
+    /// DLPack pointer (float32 state vector) for zero-copy PyTorch integration.
+    ///
+    /// # Safety
+    /// The input pointer must:
+    /// - Point to valid GPU memory on the same device as the engine
+    /// - Contain at least `input_len` f32 elements
+    /// - Remain valid for the duration of this call
+    #[cfg(target_os = "linux")]
+    pub unsafe fn encode_from_gpu_ptr_f32(
+        &self,
+        input_d: *const f32,
+        input_len: usize,
+        num_qubits: usize,
+    ) -> Result<*mut DLManagedTensor> {
+        unsafe {
+            self.encode_from_gpu_ptr_f32_with_stream(
+                input_d,
+                input_len,
+                num_qubits,
+                std::ptr::null_mut(),
+            )
+        }
+    }
+
+    /// Encode from existing GPU pointer (float32) on a specified CUDA stream.
+    ///
+    /// # Safety
+    /// In addition to the `encode_from_gpu_ptr_f32` requirements, the stream pointer
+    /// must remain valid for the duration of this call.
+    #[cfg(target_os = "linux")]
+    pub unsafe fn encode_from_gpu_ptr_f32_with_stream(
+        &self,
+        input_d: *const f32,
+        input_len: usize,
+        num_qubits: usize,
+        stream: *mut c_void,
+    ) -> Result<*mut DLManagedTensor> {
+        crate::profile_scope!("Mahout::EncodeFromGpuPtrF32");
+
+        if input_len == 0 {
+            return Err(MahoutError::InvalidInput(
+                "Input data cannot be empty".into(),
+            ));
+        }
+
+        validate_cuda_input_ptr(&self.device, input_d as *const c_void)?;
+
+        let state_len = 1usize << num_qubits;
+        if input_len > state_len {
+            return Err(MahoutError::InvalidInput(format!(
+                "Input size {} exceeds state vector size {} (2^{} qubits)",
+                input_len, state_len, num_qubits
+            )));
+        }
+
+        let state_vector = {
+            crate::profile_scope!("GPU::Alloc");
+            gpu::GpuStateVector::new(&self.device, num_qubits, Precision::Float32)?
+        };
+
+        let inv_norm = {
+            crate::profile_scope!("GPU::NormFromPtr");
+            unsafe {
+                gpu::AmplitudeEncoder::calculate_inv_norm_gpu_f32_with_stream(
+                    &self.device,
+                    input_d,
+                    input_len,
+                    stream,
+                )?
+            }
+        };
+
+        let state_ptr = state_vector.ptr_f32().ok_or_else(|| {
+            MahoutError::InvalidInput(
+                "State vector precision mismatch (expected float32 buffer)".to_string(),
+            )
+        })?;
+
+        {
+            crate::profile_scope!("GPU::KernelLaunch");
+            let ret = unsafe {
+                qdp_kernels::launch_amplitude_encode_f32(
+                    input_d,
+                    state_ptr as *mut std::ffi::c_void,
+                    input_len,
+                    state_len,
+                    inv_norm,
+                    stream,
+                )
+            };
+
+            if ret != 0 {
+                return Err(MahoutError::KernelLaunch(format!(
+                    "Amplitude encode (f32) kernel failed with CUDA error code: {} ({})",
+                    ret,
+                    cuda_error_to_string(ret)
+                )));
+            }
+        }
+
+        {
+            crate::profile_scope!("GPU::Synchronize");
+            sync_cuda_stream(stream, "CUDA stream synchronize failed")?;
+        }
+
+        if self.precision == Precision::Float32 {
+            Ok(state_vector.to_dlpack())
+        } else {
+            Err(MahoutError::NotImplemented(
+                "encode_from_gpu_ptr_f32 returns float32 state; engine precision Float64 is not supported for this path. Use encode_from_gpu_ptr with f64 input or set engine precision to Float32.".to_string(),
+            ))
+        }
+    }
+
     /// Encode batch from existing GPU pointer (zero-copy for CUDA tensors)
     ///
     /// This method enables zero-copy batch encoding from PyTorch CUDA tensors.
@@ -626,7 +750,7 @@ impl QdpEngine {
             ));
         }
 
-        validate_cuda_input_ptr(&self.device, input_batch_d)?;
+        validate_cuda_input_ptr(&self.device, input_batch_d as *const c_void)?;
 
         let state_len = 1usize << num_qubits;
         let method = encoding_method.to_ascii_lowercase();
