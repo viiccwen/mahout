@@ -14,34 +14,29 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# API Documentation: build API docs + website, upload artifact, and deploy to preview branch.
-
-name: API Docs
+name: Docs Preview
 
 on:
   pull_request:
     branches: [main]
     paths:
+      - 'website/**'
+      - 'docs/**'
       - 'qumat/**'
       - 'qdp/qdp-core/**'
       - 'qdp/qdp-python/**'
       - 'qdp/scripts/**'
       - 'qdp/Makefile'
-      - 'docs/api/**'
-      - 'docs/sphinx/**'
-      - 'docs/dev/api-docs*.md'
-      - 'website/sidebars.ts'
       - 'pyproject.toml'
       - 'Makefile'
-      - '.github/workflows/api-docs.yml'
-      - '.github/actions/deploy-preview/**'
+      - '.github/workflows/docs-preview.yml'
   workflow_dispatch:
 
 jobs:
-  api-docs:
+  build:
     runs-on: ubuntu-latest
     permissions:
-      contents: write  # push to preview branch
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -74,13 +69,11 @@ jobs:
           uv venv
           uv pip install -e . --no-deps
           uv pip install sphinx sphinx-markdown-builder sphinx-autodoc-typehints
-        # Avoid building qdp-python (CUDA); autodoc_mock_imports in conf.py
 
       - name: Build API docs
         run: |
           make docs-python
           make docs-rust || true
-        # Python docs always; docs-rust may fail without CUDA (qdp-core uses cudarc)
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -89,7 +82,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: website/package-lock.json
 
-      - name: Install website dependencies
+      - name: Install dependencies
         working-directory: website
         run: npm ci
 
@@ -97,10 +90,31 @@ jobs:
         working-directory: website
         run: npm run build
 
-      - name: Deploy preview to branch (for GitHub Pages / custom domain)
-        uses: ./.github/actions/deploy-preview
-        with:
-          commit_message: "API docs preview: build ${{ github.run_id }} (${{ github.sha }})"
+      - name: Deploy preview to branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BUILD_SRC="${{ github.workspace }}/website/build"
+          if [[ ! -d "$BUILD_SRC" ]]; then
+            echo "::error::Build directory not found: $BUILD_SRC"
+            exit 1
+          fi
+          TEMP=$(mktemp -d)
+          cp -r "$BUILD_SRC"/* "$TEMP/"
+          git fetch origin gsoc-docs-preview 2>/dev/null || true
+          git checkout -B gsoc-docs-preview origin/gsoc-docs-preview 2>/dev/null || git checkout --orphan gsoc-docs-preview
+          find . -maxdepth 1 ! -name '.git' ! -name '.' ! -name '..' -exec rm -rf {} +
+          cp -r "$TEMP"/* .
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to deploy"
+          else
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --no-verify -m "Docs & website preview: build ${{ github.run_id }} (${{ github.sha }})"
+            git push -f origin gsoc-docs-preview
+            echo "Preview deployed to branch 'gsoc-docs-preview'. Enable GitHub Pages from this branch to view live."
+          fi
 
       - name: Upload website preview
         uses: actions/upload-artifact@v4

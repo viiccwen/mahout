@@ -34,6 +34,40 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Set up Rust (stable + nightly)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install nightly and rustdoc-md
+        run: |
+          rustup install nightly
+          cargo install rustdoc-md
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: qdp
+
+      - name: Prepare docs environment
+        run: |
+          uv venv
+          uv pip install -e . --no-deps
+          uv pip install sphinx sphinx-markdown-builder sphinx-autodoc-typehints
+
+      - name: Build API docs
+        run: |
+          make docs-python
+          make docs-rust || true
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -53,31 +87,16 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Configure git
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
-
-          # Create a temporary directory for the build
           BUILD_DIR=$(mktemp -d)
-          cp -r website/build/* $BUILD_DIR/
-
-          # Fetch and checkout asf-site branch
+          cp -r website/build/* "$BUILD_DIR/"
           git fetch origin asf-site
           git checkout -B asf-site origin/asf-site || git checkout --orphan asf-site
-
-          # Remove old content (except .git, .asf.yaml, and .claude if present)
           find . -maxdepth 1 ! -name '.git' ! -name '.asf.yaml' ! -name '.claude' ! -name 'website' ! -name '.' ! -name '..' -exec rm -rf {} +
-
-          # Copy new content
-          cp -r $BUILD_DIR/* .
-
-          # Remove website source directory (only keep built site)
+          cp -r "$BUILD_DIR"/* .
           rm -rf website
-
-          # Add and commit changes
           git add -A
-
-          # Only commit if there are changes
           if git diff --staged --quiet; then
             echo "No changes to deploy"
           else
