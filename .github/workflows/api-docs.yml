@@ -1,0 +1,109 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+# (the "License"); you may not use this file except in compliance with
+# the License.  You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#
+# API Documentation: build API docs + website, upload artifact, and deploy to preview branch.
+
+name: API Docs
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'qumat/**'
+      - 'qdp/qdp-core/**'
+      - 'qdp/qdp-python/**'
+      - 'qdp/scripts/**'
+      - 'qdp/Makefile'
+      - 'docs/api/**'
+      - 'docs/sphinx/**'
+      - 'docs/dev/api-docs*.md'
+      - 'website/sidebars.ts'
+      - 'pyproject.toml'
+      - 'Makefile'
+      - '.github/workflows/api-docs.yml'
+      - '.github/actions/deploy-preview/**'
+  workflow_dispatch:
+
+jobs:
+  api-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # push to preview branch
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Set up Rust (stable + nightly)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install nightly and rustdoc-md
+        run: |
+          rustup install nightly
+          cargo install rustdoc-md
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: qdp
+
+      - name: Prepare docs environment
+        run: |
+          uv venv
+          uv pip install -e . --no-deps
+          uv pip install sphinx sphinx-markdown-builder sphinx-autodoc-typehints
+        # Avoid building qdp-python (CUDA); autodoc_mock_imports in conf.py
+
+      - name: Build API docs
+        run: |
+          make docs-python
+          make docs-rust || true
+        # Python docs always; docs-rust may fail without CUDA (qdp-core uses cudarc)
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install website dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Build website
+        working-directory: website
+        run: npm run build
+
+      - name: Deploy preview to branch (for GitHub Pages / custom domain)
+        uses: ./.github/actions/deploy-preview
+        with:
+          commit_message: "API docs preview: build ${{ github.run_id }} (${{ github.sha }})"
+
+      - name: Upload website preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-preview
+          path: website/build

@@ -1,0 +1,126 @@
+#
+# Licensed to the Apache Software Foundation (ASF) under one or more
+# contributor license agreements.  See the NOTICE file distributed with
+# this work for additional information regarding copyright ownership.
+# The ASF licenses this file to You under the Apache License, Version 2.0
+#
+# When a version tag (v*) is pushed: run docs-version, commit versioned docs to main, build and deploy.
+#
+name: Docs Version on Tag
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  version-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # push versioned docs back to main and deploy
+    steps:
+      - name: Checkout at tag
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Get version from tag
+        id: version
+        run: |
+          REF="${{ github.ref }}"
+          # refs/tags/v1.2.3 or refs/tags/v0.7 -> 1.2.3 or 0.7
+          V="${REF#refs/tags/v}"
+          echo "version=$V" >> $GITHUB_OUTPUT
+          echo "Version: $V"
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        run: pip install uv
+
+      - name: Set up Rust (stable + nightly)
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Install nightly and rustdoc-md
+        run: |
+          rustup install nightly
+          cargo install rustdoc-md
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: qdp
+
+      - name: Prepare docs environment
+        run: |
+          uv venv
+          uv pip install -e . --no-deps
+          uv pip install sphinx sphinx-markdown-builder sphinx-autodoc-typehints
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: website/package-lock.json
+
+      - name: Install website dependencies
+        working-directory: website
+        run: npm ci
+
+      - name: Run docs-version (Python + Rust; Rust may fail without CUDA)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          rm -rf website/versioned_docs/version-$VERSION
+          rm -f website/versioned_sidebars/version-$VERSION-sidebars.json
+          cd website && node -e "const v=require('./versions.json'); const i=v.indexOf('$VERSION'); if(i>=0){v.splice(i,1); require('fs').writeFileSync('versions.json', JSON.stringify(v,null,2));}"
+          cd website && node scripts/set-docs-version.js $VERSION
+          make docs-python
+          make docs-rust || true
+          cd website && npm run sync && npx docusaurus docs:version $VERSION
+
+      - name: Commit versioned docs to main
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git add website/versioned_docs website/versioned_sidebars website/versions.json website/docusaurus.config.ts
+          if git diff --staged --quiet; then
+            echo "No versioned docs changes to commit"
+          else
+            git commit -m "docs: add version ${{ steps.version.outputs.version }} (from tag)"
+            git push origin HEAD:main
+          fi
+
+      - name: Build website
+        working-directory: website
+        run: npm run build
+
+      - name: Deploy to asf-site branch
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BUILD_DIR=$(mktemp -d)
+          cp -r website/build/* "$BUILD_DIR/"
+          git fetch origin asf-site
+          git checkout -B asf-site origin/asf-site || git checkout --orphan asf-site
+          find . -maxdepth 1 ! -name '.git' ! -name '.asf.yaml' ! -name '.claude' ! -name 'website' ! -name '.' ! -name '..' -exec rm -rf {} +
+          cp -r "$BUILD_DIR"/* .
+          rm -rf website
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to deploy"
+          else
+            git commit --no-verify -m "Automatic Site Publish by GitHub Actions (version ${{ steps.version.outputs.version }})"
+            git push origin asf-site
+            echo "Website deployed to asf-site"
+          fi

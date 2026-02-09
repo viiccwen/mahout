@@ -23,10 +23,13 @@ on:
       - 'website/**'
       - 'docs/**'
       - '.github/workflows/website-build.yml'
+      - '.github/actions/deploy-preview/**'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # push to preview branch
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -45,3 +48,8 @@ jobs:
       - name: Build website
         working-directory: website
         run: npm run build
+
+      - name: Deploy preview to branch
+        uses: ./.github/actions/deploy-preview
+        with:
+          commit_message: "Website preview: build ${{ github.run_id }} (${{ github.sha }})"

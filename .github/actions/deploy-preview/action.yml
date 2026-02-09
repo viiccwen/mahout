@@ -1,0 +1,47 @@
+# Deploy a built site to the "preview" branch for GitHub Pages / custom domain review.
+# Requires: job has permissions: contents: write and GITHUB_TOKEN.
+# Inputs:
+#   build_dir: path to the built site (default: website/build)
+#   commit_message: optional custom commit message
+name: Deploy to preview branch
+description: Push build directory to branch "preview" for live review (GitHub Pages / custom domain)
+inputs:
+  build_dir:
+    description: Path to the built site directory (relative to repo root)
+    required: false
+    default: website/build
+  commit_message:
+    description: 'Commit message for the preview deploy (default: "Preview: build <run_id> (<sha>)")'
+    required: false
+runs:
+  using: composite
+  steps:
+    - name: Deploy preview to branch
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        BUILD_DIR: ${{ inputs.build_dir }}
+        COMMIT_MSG: ${{ inputs.commit_message }}
+      shell: bash
+      run: |
+        BUILD_SRC="${{ github.workspace }}/${BUILD_DIR}"
+        if [[ ! -d "$BUILD_SRC" ]]; then
+          echo "::error::Build directory not found: $BUILD_SRC"
+          exit 1
+        fi
+        TEMP=$(mktemp -d)
+        cp -r "$BUILD_SRC"/* "$TEMP/"
+        git fetch origin preview 2>/dev/null || true
+        git checkout -B preview origin/preview 2>/dev/null || git checkout --orphan preview
+        find . -maxdepth 1 ! -name '.git' ! -name '.' ! -name '..' -exec rm -rf {} +
+        cp -r "$TEMP"/* .
+        git add -A
+        if git diff --staged --quiet; then
+          echo "No changes to deploy"
+        else
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          MSG="${COMMIT_MSG:-Preview: build ${GITHUB_RUN_ID} (${GITHUB_SHA})}"
+          git commit --no-verify -m "$MSG"
+          git push -f origin preview
+          echo "Preview deployed to branch 'preview'. Enable GitHub Pages from this branch to view live."
+        fi
