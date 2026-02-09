@@ -27,6 +27,7 @@ This document describes **repository-wide** setup and workflow. For **subproject
 - [Development Workflow](#development-workflow)
 - [Testing](#testing)
 - [Project-Specific Guides](#project-specific-guides)
+- [API documentation](#api-documentation)
 - [Troubleshooting](#troubleshooting)
 - [References](#references)
 
@@ -147,6 +148,22 @@ Apache Mahout includes several subprojects. Use the root workflow above for issu
 
 - **Pre-commit fails:** Run `pre-commit run --all-files` to see errors. Common fixes: `cargo fmt` (Rust), `cargo clippy` (Rust lint), and ensuring you use the repo venv (`uv run pre-commit` or `make pre-commit`).
 - **Wrong Python or missing package:** Ensure the virtual environment is activated and you ran `uv sync --group dev` from the repo root. For QDP, see [qdp/CONTRIBUTING.md](qdp/CONTRIBUTING.md).
+
+---
+
+## API documentation
+
+API docs are generated from code and live under `docs/api/`. **Generate before previewing the website** so the site includes them.
+
+| Command | Description |
+|---------|-------------|
+| `make docs` | Generate Python (Sphinx) + Rust (rustdoc-md) API docs into `docs/api/`. |
+| `make docs-python` | Python API only. |
+| `make docs-rust` | Rust API only (uses nightly + rustdoc-md; script auto-installs if missing). |
+
+**Local preview:** From repo root run `make docs`, then `cd website && npm run sync && npm run start`. Do not run `npm run sync` before `make docs` if you want the built site to include API docs.
+
+**Versioned API docs (release):** Run `make docs-version VERSION=X.Y` to snapshot current docs as version X.Y (updates config and runs docs:version).
 
 ---
 

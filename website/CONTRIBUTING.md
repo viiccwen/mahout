@@ -41,6 +41,8 @@ This starts the dev server at `http://localhost:3000` with hot reload.
 - **Source:** `/docs/` — edit here
 - **Synced:** `website/docs/` — generated; do not edit manually
 
+**API docs** (Python and Rust) are generated from code. **Generate them before sync/build** so the site includes them: from repo root run `make docs`, then from `website/` run `npm run sync` (or `npm run start` / `npm run build`, which run sync first). Do not sync before `make docs` if you want API reference pages in the preview.
+
 Sync manually if needed:
 
 ```bash
@@ -60,8 +62,9 @@ npm run sync
 ## Adding or Changing Docs
 
 1. Add or edit Markdown under **`/docs/`** (repo root).
-2. Update **`website/sidebars.ts`** if you add new pages or sections.
-3. Run `npm run sync` (or restart `npm run start`) to preview.
+2. For **API docs**: run `make docs` from repo root first; see root [CONTRIBUTING.md](../CONTRIBUTING.md#api-documentation).
+3. Update **`website/sidebars.ts`** if you add new pages or sections.
+4. Run `npm run sync` (or restart `npm run start`) to preview.
 
 Use **kebab-case** for file names and frontmatter `title` in each doc. See [website/README.md](README.md) for sidebar config, images, math, and versioning.
 

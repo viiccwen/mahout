@@ -1,4 +1,4 @@
-.PHONY: install install_profile install_benchmark build build_nvtx_profile run_nvtx_profile test test_python test_rust benchmark clean help
+.PHONY: install install_profile install_benchmark build build_nvtx_profile run_nvtx_profile test test_python test_rust benchmark clean docs-api help
 
 help:
 	@echo "Available targets:"
@@ -6,6 +6,7 @@ help:
 	@echo "  make build_nvtx_profile  - Build qdp-core with observability features"
 	@echo "  make run_nvtx_profile    - Build example, run with nsys, and show stats (EXAMPLE=nvtx_profile)"
 	@echo "  make test_rust           - Run Rust unit tests only"
+	@echo "  make docs-api             - Generate Rust API docs as Markdown"
 	@echo "  make clean               - Clean build artifacts"
 
 build:
@@ -28,6 +29,9 @@ run_nvtx_profile:
 	nsys profile --trace=cuda,nvtx --force-overwrite=true -o report ./target/release/examples/$(EXAMPLE)
 	@echo "Showing profiling statistics..."
 	nsys stats --force-export=true report.nsys-rep
+
+docs-api:
+	@./scripts/gen_rust_api_docs.sh
 
 clean:
 	@echo "Cleaning build artifacts..."
