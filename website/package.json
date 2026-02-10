@@ -5,8 +5,8 @@
   "scripts": {
     "docusaurus": "docusaurus",
     "sync": "node scripts/sync-docs.js",
-    "start": "npm run sync && docusaurus start",
-    "prebuild": "npm run sync",
+    "start": "npm run sync && node scripts/generate-api-sidebars.js && docusaurus start",
+    "prebuild": "npm run sync && node scripts/generate-api-sidebars.js",
     "build": "docusaurus build",
     "swizzle": "docusaurus swizzle",
     "deploy": "docusaurus deploy",

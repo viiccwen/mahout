@@ -1,0 +1,3 @@
+# Rust packages to document for API Reference (one per line).
+# Generated docs go to docs/api/rust/<package>.md
+qdp-core

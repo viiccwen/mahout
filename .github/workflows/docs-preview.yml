@@ -14,25 +14,32 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-name: Deploy Website
+name: Docs Preview
 
 on:
-  push:
+  pull_request:
     branches: [main]
     paths:
       - 'website/**'
       - 'docs/**'
-      - '.github/workflows/website.yml'
+      - 'qumat/**'
+      - 'qdp/qdp-core/**'
+      - 'qdp/qdp-python/**'
+      - 'qdp/scripts/**'
+      - 'qdp/Makefile'
+      - 'pyproject.toml'
+      - 'Makefile'
+      - '.github/workflows/docs-preview.yml'
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -83,24 +90,34 @@ jobs:
         working-directory: website
         run: npm run build
 
-      - name: Deploy to asf-site branch
+      - name: Deploy preview to branch
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          BUILD_DIR=$(mktemp -d)
-          cp -r website/build/* "$BUILD_DIR/"
-          git fetch origin asf-site
-          git checkout -B asf-site origin/asf-site || git checkout --orphan asf-site
-          find . -maxdepth 1 ! -name '.git' ! -name '.asf.yaml' ! -name '.claude' ! -name 'website' ! -name '.' ! -name '..' -exec rm -rf {} +
-          cp -r "$BUILD_DIR"/* .
-          rm -rf website
+          BUILD_SRC="${{ github.workspace }}/website/build"
+          if [[ ! -d "$BUILD_SRC" ]]; then
+            echo "::error::Build directory not found: $BUILD_SRC"
+            exit 1
+          fi
+          TEMP=$(mktemp -d)
+          cp -r "$BUILD_SRC"/* "$TEMP/"
+          git fetch origin gsoc-docs-preview 2>/dev/null || true
+          git checkout -B gsoc-docs-preview origin/gsoc-docs-preview 2>/dev/null || git checkout --orphan gsoc-docs-preview
+          find . -maxdepth 1 ! -name '.git' ! -name '.' ! -name '..' -exec rm -rf {} +
+          cp -r "$TEMP"/* .
           git add -A
           if git diff --staged --quiet; then
             echo "No changes to deploy"
           else
-            git commit --no-verify -m "Automatic Site Publish by GitHub Actions"
-            git push origin asf-site
-            echo "Website deployed successfully to asf-site branch"
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git commit --no-verify -m "Docs & website preview: build ${{ github.run_id }} (${{ github.sha }})"
+            git push -f origin gsoc-docs-preview
+            echo "Preview deployed to branch 'gsoc-docs-preview'. Enable GitHub Pages from this branch to view live."
           fi
+
+      - name: Upload website preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: website-preview
+          path: website/build

@@ -77,7 +77,7 @@ class QuMat:
 
         :param num_qubits: Number of qubits in the circuit. If ``None``,
             creates a circuit without pre-allocated qubits.
-        :type num_qubits: int | None, optional
+        :type num_qubits: int \| None, optional
         """
         self.num_qubits = num_qubits
         self.circuit = self.backend_module.create_empty_circuit(num_qubits)
@@ -121,7 +121,7 @@ class QuMat:
     def apply_not_gate(self, qubit_index):
         """Apply a NOT gate (Pauli-X gate) to the specified qubit.
 
-        Flips the qubit state from |0⟩ to |1⟩ or |1⟩ to |0⟩.
+        Flips the qubit state from \|0⟩ to \|1⟩ or \|1⟩ to \|0⟩.
         Equivalent to the Pauli-X gate.
 
         :param qubit_index: Index of the qubit.
@@ -135,8 +135,8 @@ class QuMat:
     def apply_hadamard_gate(self, qubit_index):
         """Apply a Hadamard gate to the specified qubit.
 
-        Creates a superposition state, transforming |0⟩ to (|0⟩ + |1⟩)/√2
-        and |1⟩ to (|0⟩ - |1⟩)/√2.
+        Creates a superposition state, transforming \|0⟩ to (\|0⟩ + \|1⟩)/√2
+        and \|1⟩ to (\|0⟩ - \|1⟩)/√2.
 
         :param qubit_index: Index of the qubit.
         :type qubit_index: int
@@ -150,7 +150,7 @@ class QuMat:
         """Apply a Controlled-NOT (CNOT) gate between two qubits.
 
         Fundamental for entangling qubits. Flips the target qubit if and only
-        if the control qubit is in the |1⟩ state.
+        if the control qubit is in the \|1⟩ state.
 
         :param control_qubit_index: Index of the control qubit.
         :type control_qubit_index: int
@@ -171,7 +171,7 @@ class QuMat:
         """Apply a Toffoli gate (CCX gate) to three qubits.
 
         Acts as a quantum AND gate. Flips the target qubit if and only if
-        both control qubits are in the |1⟩ state.
+        both control qubits are in the \|1⟩ state.
 
         :param control_qubit_index1: Index of the first control qubit.
         :type control_qubit_index1: int
@@ -209,7 +209,7 @@ class QuMat:
         """Apply a controlled-SWAP (Fredkin) gate.
 
         Swaps the states of two target qubits if and only if the control
-        qubit is in the |1⟩ state.
+        qubit is in the \|1⟩ state.
 
         :param control_qubit_index: Index of the control qubit.
         :type control_qubit_index: int
@@ -230,8 +230,8 @@ class QuMat:
     def apply_pauli_x_gate(self, qubit_index):
         """Apply a Pauli-X gate to the specified qubit.
 
-        Equivalent to the NOT gate. Flips the qubit state from |0⟩ to |1⟩
-        or |1⟩ to |0⟩.
+        Equivalent to the NOT gate. Flips the qubit state from \|0⟩ to \|1⟩
+        or \|1⟩ to \|0⟩.
 
         :param qubit_index: Index of the qubit.
         :type qubit_index: int
@@ -272,7 +272,7 @@ class QuMat:
     def apply_t_gate(self, qubit_index):
         """Apply a T-gate (π/8 gate) to the specified qubit.
 
-        Applies a relative pi/4 phase (multiplies the |1> state by e^{i*pi/4}).
+        Applies a relative pi/4 phase (multiplies the \|1> state by e^{i*pi/4}).
         Essential for universal quantum computation when combined with
         Hadamard and CNOT gates.
 
@@ -296,7 +296,7 @@ class QuMat:
         :returns: Measurement results. Format depends on the backend:
             - Qiskit/Braket: Dictionary with state strings as keys and counts as values
             - Cirq: List of dictionaries with integer states as keys
-        :rtype: dict | list[dict]
+        :rtype: dict \| list[dict]
         :raises RuntimeError: If the circuit has not been initialized.
         """
         self._ensure_circuit_initialized()
@@ -395,7 +395,7 @@ class QuMat:
         depends on the backend implementation.
 
         :returns: Circuit visualization. The exact type depends on the backend.
-        :rtype: str | object
+        :rtype: str \| object
         :raises RuntimeError: If the circuit has not been initialized.
         """
         self._ensure_circuit_initialized()
@@ -408,7 +408,7 @@ class QuMat:
         library conventions and documentation examples.
 
         :returns: Circuit visualization. The exact type depends on the backend.
-        :rtype: str | object
+        :rtype: str \| object
         :raises RuntimeError: If the circuit has not been initialized.
         """
         return self.draw_circuit()
@@ -424,7 +424,7 @@ class QuMat:
         :type qubit_index: int
         :param angle: Rotation angle in radians. Can be a float or a string
             parameter name.
-        :type angle: float | str
+        :type angle: float \| str
         :raises RuntimeError: If the circuit has not been initialized.
         """
         self._ensure_circuit_initialized()
@@ -443,7 +443,7 @@ class QuMat:
         :type qubit_index: int
         :param angle: Rotation angle in radians. Can be a float or a string
             parameter name.
-        :type angle: float | str
+        :type angle: float \| str
         :raises RuntimeError: If the circuit has not been initialized.
         """
         self._ensure_circuit_initialized()
@@ -462,7 +462,7 @@ class QuMat:
         :type qubit_index: int
         :param angle: Rotation angle in radians. Can be a float or a string
             parameter name.
-        :type angle: float | str
+        :type angle: float \| str
         :raises RuntimeError: If the circuit has not been initialized.
         """
         self._ensure_circuit_initialized()
@@ -478,7 +478,7 @@ class QuMat:
 
         :param param_name: Parameter name to handle. If it's a string,
             registers it as a parameter.
-        :type param_name: str | float
+        :type param_name: str \| float
         """
         if isinstance(param_name, str) and param_name not in self.parameters:
             self.parameters[param_name] = None
@@ -507,14 +507,14 @@ class QuMat:
         """Implement the swap test circuit for measuring overlap between two quantum states.
 
         Measures the inner product between the states on ``qubit1`` and ``qubit2``.
-        The probability of measuring the ancilla qubit in state |0⟩ is related
-        to the overlap as: P(0) = (1 + |⟨ψ|φ⟩|²) / 2
+        The probability of measuring the ancilla qubit in state \|0⟩ is related
+        to the overlap as: P(0) = (1 + \|⟨ψ\|φ⟩\|²) / 2
 
-        :param ancilla_qubit: Index of the ancilla qubit (should be initialized to |0⟩).
+        :param ancilla_qubit: Index of the ancilla qubit (should be initialized to \|0⟩).
         :type ancilla_qubit: int
-        :param qubit1: Index of the first qubit containing state |ψ⟩.
+        :param qubit1: Index of the first qubit containing state \|ψ⟩.
         :type qubit1: int
-        :param qubit2: Index of the second qubit containing state |φ⟩.
+        :param qubit2: Index of the second qubit containing state \|φ⟩.
         :type qubit2: int
         :raises RuntimeError: If the circuit has not been initialized.
         """
@@ -532,24 +532,24 @@ class QuMat:
 
         Creates a swap test circuit to calculate the similarity between the
         quantum states on ``qubit1`` and ``qubit2``. Returns the squared overlap
-        |⟨ψ|φ⟩|², which represents the fidelity between the two states.
+        \|⟨ψ\|φ⟩\|², which represents the fidelity between the two states.
 
         The swap test measures P(ancilla=0), related to overlap as:
-        P(0) = (1 + |⟨ψ|φ⟩|²) / 2
+        P(0) = (1 + \|⟨ψ\|φ⟩\|²) / 2
 
         For certain states (especially identical excited states), global phase
-        effects may cause the ancilla to measure predominantly |1⟩ instead of |0⟩.
+        effects may cause the ancilla to measure predominantly \|1⟩ instead of \|0⟩.
         This method handles both cases by taking the measurement probability
         closer to 1.
 
-        :param qubit1: Index of the first qubit containing state |ψ⟩.
+        :param qubit1: Index of the first qubit containing state \|ψ⟩.
         :type qubit1: int
-        :param qubit2: Index of the second qubit containing state |φ⟩.
+        :param qubit2: Index of the second qubit containing state \|φ⟩.
         :type qubit2: int
         :param ancilla_qubit: Index of the ancilla qubit. Default is 0. Should be
-            initialized to |0⟩.
+            initialized to \|0⟩.
         :type ancilla_qubit: int, optional
-        :returns: The squared overlap |⟨ψ|φ⟩|² between the two states (fidelity),
+        :returns: The squared overlap \|⟨ψ\|φ⟩\|² between the two states (fidelity),
             clamped to the range [0.0, 1.0].
         :rtype: float
         :raises RuntimeError: If the circuit has not been initialized.
@@ -558,7 +558,7 @@ class QuMat:
         self.swap_test(ancilla_qubit, qubit1, qubit2)
         results = self.execute_circuit()
 
-        # Calculate the probability of measuring ancilla in |0> state
+        # Calculate the probability of measuring ancilla in \|0> state
         prob_zero = self.calculate_prob_zero(results, ancilla_qubit)
         prob_zero_or_one = max(prob_zero, 1 - prob_zero)
         overlap_squared = 2 * prob_zero_or_one - 1
@@ -567,17 +567,17 @@ class QuMat:
         return overlap_squared
 
     def calculate_prob_zero(self, results, ancilla_qubit):
-        """Calculate the probability of measuring the ancilla qubit in |0⟩ state.
+        """Calculate the probability of measuring the ancilla qubit in \|0⟩ state.
 
         Delegates to the backend-specific implementation. Different backends
         may use different qubit ordering conventions (little-endian vs big-endian).
 
         :param results: Measurement results from ``execute_circuit()``. Format
             depends on the backend.
-        :type results: dict | list[dict]
+        :type results: dict \| list[dict]
         :param ancilla_qubit: Index of the ancilla qubit.
         :type ancilla_qubit: int
-        :returns: Probability of measuring the ancilla qubit in |0⟩ state.
+        :returns: Probability of measuring the ancilla qubit in \|0⟩ state.
         :rtype: float
         """
         return self.backend_module.calculate_prob_zero(

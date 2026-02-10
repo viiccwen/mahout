@@ -1,4 +1,5 @@
 import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
+import {apiSidebarItems} from './sidebars-api.generated';
 
 /**
  * Apache Mahout Documentation Sidebars
@@ -24,6 +25,13 @@ const sidebars: SidebarsConfig = {
         'qumat/concepts',
         'qumat/examples',
       ],
+    },
+    {
+      type: 'category',
+      label: 'API Reference',
+      collapsed: false,
+      link: {type: 'doc', id: 'api/index'},
+      items: apiSidebarItems,
     },
     {
       type: 'category',
