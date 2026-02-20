@@ -60,8 +60,10 @@ jobs:
           name: python-coverage
           path: coverage.xml
 
+  # Requires GPU/CUDA
   rust-coverage:
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v6
 
@@ -94,14 +96,22 @@ jobs:
         with:
           name: python-coverage
 
-      - name: Download Rust coverage
+      - name: Download Rust coverage (optional; absent when no GPU)
         uses: actions/download-artifact@v4
         with:
           name: rust-coverage
           path: .
+        continue-on-error: true
+
+      - name: Set coverage files for Codecov
+        id: files
+        run: |
+          FILES="coverage.xml"
+          if [ -f qdp/lcov.info ]; then FILES="coverage.xml,qdp/lcov.info"; fi
+          echo "files=$FILES" >> $GITHUB_OUTPUT
 
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: coverage.xml,qdp/lcov.info
-          fail_ci_if_error: true
+          files: ${{ steps.files.outputs.files }}
+          fail_ci_if_error: false
