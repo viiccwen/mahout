@@ -21,17 +21,13 @@ on:
     branches: [main]
     paths:
       - "**.py"
-      - "**/*.rs"
       - "pyproject.toml"
-      - "qdp/**/Cargo.toml"
       - ".github/workflows/coverage.yml"
   pull_request:
     branches: [main]
     paths:
       - "**.py"
-      - "**/*.rs"
       - "pyproject.toml"
-      - "qdp/**/Cargo.toml"
       - ".github/workflows/coverage.yml"
   workflow_dispatch:
 
@@ -60,34 +56,9 @@ jobs:
           name: python-coverage
           path: coverage.xml
 
-  # Requires GPU/CUDA
-  rust-coverage:
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: Set up Rust
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Install llvm-tools
-        run: rustup component add llvm-tools-preview
-
-      - name: Install cargo-llvm-cov
-        run: cargo install cargo-llvm-cov
-
-      - name: Run Rust tests with coverage
-        working-directory: qdp
-        run: cargo llvm-cov test --workspace --exclude qdp-python --lcov --output-path lcov.info
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: rust-coverage
-          path: qdp/lcov.info
-
   codecov:
     runs-on: ubuntu-latest
-    needs: [python-coverage, rust-coverage]
+    needs: [python-coverage]
     steps:
       - uses: actions/checkout@v6
 
@@ -96,22 +67,9 @@ jobs:
         with:
           name: python-coverage
 
-      - name: Download Rust coverage (optional; absent when no GPU)
-        uses: actions/download-artifact@v4
-        with:
-          name: rust-coverage
-          path: .
-        continue-on-error: true
-
-      - name: Set coverage files for Codecov
-        id: files
-        run: |
-          FILES="coverage.xml"
-          if [ -f qdp/lcov.info ]; then FILES="coverage.xml,qdp/lcov.info"; fi
-          echo "files=$FILES" >> $GITHUB_OUTPUT
-
       - name: Upload to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ${{ steps.files.outputs.files }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: coverage.xml
           fail_ci_if_error: false
