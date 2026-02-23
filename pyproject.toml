@@ -85,6 +85,18 @@ markers = [
     "slow: marks tests as slow running",
 ]
 
+[tool.coverage.run]
+source = ["qumat"]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
+]
+
 [tool.ty.src]
 exclude = [
     ".github/scripts/",
